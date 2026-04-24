@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Warp Tree Project</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: black;
+        font-family: monospace;
+    }
+
+    canvas {
+        display: block;
+    }
+
+    .title {
+        position: absolute;
+        top: 12px;
+        left: 16px;
+        color: white;
+        opacity: 0.5;
+        letter-spacing: 2px;
+        font-size: 13px;
+    }
+</style>
+</head>
+<body>
+
+<div class="title">Warp Tree Project</div>
+<canvas id="c"></canvas>
+
+<script>
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+let W, H;
+function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+}
+window.addEventListener("resize", resize);
+resize();
+
+const img = new Image();
+img.src = "figure-1.jpg";
+
+let pieces = [];
+let cols = 60;
+let rows = 60;
+
+let mode = 0;
+let time = 0;
+
+let core = { x: W/2, y: H/2 };
+
+function initPieces() {
+    pieces = [];
+
+    let pw = img.width / cols;
+    let ph = img.height / rows;
+
+    for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+
+            let tx = (W - img.width)/2 + x * pw;
+            let ty = (H - img.height)/2 + y * ph;
+
+            pieces.push({
+                sx: x * pw,
+                sy: y * ph,
+                sw: pw,
+                sh: ph,
+
+                x: tx,
+                y: ty,
+
+                tx: tx,
+                ty: ty,
+
+                vx: 0,
+                vy: 0,
+
+                seed: Math.random() * 1000,
+                mass: 0.5 + Math.random(),
+                cohesion: Math.random()
+            });
+        }
+    }
+}
+
+img.onload = () => {
+    initPieces();
+    animate();
+};
+
+function trigger() {
+    mode = (mode + 1) % 4;
+
+    if (mode === 1) {
+        // break into dust
+        pieces.forEach(p => {
+            p.vx = (Math.random() - 0.5) * 15;
+            p.vy = (Math.random() - 0.5) * 15;
+        });
+    }
+
+    if (mode === 2) {
+        // free swarm
+    }
+
+    if (mode === 3) {
+        // reformation
+    }
+
+    if (mode === 0) {
+        // stable membrane
+    }
+}
+
+window.addEventListener("click", trigger);
+window.addEventListener("touchstart", trigger);
+
+function updateCore() {
+    core.x = W/2 + Math.sin(time * 0.7) * 200;
+    core.y = H/2 + Math.cos(time * 0.5) * 150;
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+    time += 0.016;
+
+    updateCore();
+
+    ctx.fillStyle = "rgba(0,0,0,0.25)";
+    ctx.fillRect(0, 0, W, H);
+
+    pieces.forEach((p, i) => {
+
+        let ax = 0;
+        let ay = 0;
+
+        if (mode === 0) {
+            // membrane wobble
+            ax += (p.tx - p.x) * 0.02;
+            ay += (p.ty - p.y) * 0.02;
+
+            ax += Math.sin(time + p.seed) * 0.3;
+            ay += Math.cos(time + p.seed) * 0.3;
+        }
+
+        if (mode === 1) {
+            // dust expansion
+            ax += (Math.random() - 0.5) * 0.5;
+            ay += (Math.random() - 0.5) * 0.5;
+        }
+
+        if (mode === 2) {
+            // field-driven swarm
+
+            let dx = core.x - p.x;
+            let dy = core.y - p.y;
+            let dist = Math.sqrt(dx*dx + dy*dy) + 0.001;
+
+            // attraction to core
+            ax += dx / dist * 0.5;
+            ay += dy / dist * 0.5;
+
+            // weak memory pull
+            ax += (p.tx - p.x) * 0.005;
+            ay += (p.ty - p.y) * 0.005;
+
+            // local cohesion (cheap approximation)
+            if (i % 5 === 0) {
+                let n = pieces[(i + 1) % pieces.length];
+                ax += (n.x - p.x) * 0.01 * p.cohesion;
+                ay += (n.y - p.y) * 0.01 * p.cohesion;
+            }
+        }
+
+        if (mode === 3) {
+            // emergent reassembly
+            ax += (p.tx - p.x) * 0.05;
+            ay += (p.ty - p.y) * 0.05;
+        }
+
+        p.vx += ax / p.mass;
+        p.vy += ay / p.mass;
+
+        p.vx *= 0.95;
+        p.vy *= 0.95;
+
+        p.x += p.vx;
+        p.y += p.vy;
+
+        // draw
+        ctx.save();
+
+        ctx.translate(p.x + p.sw/2, p.y + p.sh/2);
+
+        let wobble = Math.sin(time * 2 + p.seed) * 0.15;
+        ctx.rotate(wobble);
+
+        let scale = 1 + Math.sin(time + p.seed) * 0.1;
+        ctx.scale(scale, scale);
+
+        ctx.drawImage(
+            img,
+            p.sx, p.sy, p.sw, p.sh,
+            -p.sw/2, -p.sh/2,
+            p.sw, p.sh
+        );
+
+        ctx.restore();
+    });
+}
+</script>
+
+</body>
+</html>
